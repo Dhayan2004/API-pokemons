@@ -3,10 +3,11 @@ import {
   View,
   Text,
   ScrollView,
-  Image,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,25 +15,29 @@ import { lookupPlayerById } from '../../services/footballApi';
 import { Player } from '../../types/player';
 import { PositionBadge } from '../../components/PositionBadge';
 import { EducationalPositionCard } from '../../components/EducationalPositionCard';
-import { FallbackImage } from '../../components/FallbackImage';
+import { PlayerImage } from '../../components/PlayerImage';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState } from '../../components/ErrorState';
+import { useComparison } from '../../context/ComparisonContext';
+import { useFavorites } from '../../context/FavoritesContext';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../constants/theme';
 
 export default function JugadorDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { selectPlayer, whichSlot } = useComparison();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { showToast } = useToast();
 
   const [player, setPlayer] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [imgError, setImgError] = useState(false);
 
   const fetchPlayerDetail = async () => {
     if (!id) return;
     setLoading(true);
     setError(null);
-    setImgError(false);
 
     try {
       const data = await lookupPlayerById(id as string);
@@ -53,6 +58,23 @@ export default function JugadorDetailScreen() {
     fetchPlayerDetail();
   }, [id]);
 
+  const assignedSlot = player ? whichSlot(player.idPlayer) : null;
+  const isFav = player ? isFavorite(player.idPlayer) : false;
+
+  const handleComparePress = async () => {
+    if (!player) return;
+    if (assignedSlot !== null) {
+      router.push('/(tabs)/comparar');
+      return;
+    }
+    const res = await selectPlayer(player);
+    if (!res.success && res.message) {
+      showToast(res.message, 'warning');
+    } else if (res.message) {
+      showToast(res.message, 'success');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Top Header Bar */}
@@ -68,8 +90,25 @@ export default function JugadorDetailScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           Ficha de Jugador
         </Text>
-        <View style={{ width: 60 }} />
+        {player ? (
+          <TouchableOpacity
+            style={styles.topBarFavBtn}
+            onPress={() => toggleFavorite(player)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={isFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+          >
+            <Ionicons
+              name={isFav ? 'heart' : 'heart-outline'}
+              size={24}
+              color={isFav ? '#F87171' : COLORS.white}
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 44 }} />
+        )}
       </View>
+
 
       {loading ? (
         <LoadingState message="Cargando ficha detallada del futbolista..." />
@@ -97,20 +136,13 @@ export default function JugadorDetailScreen() {
               )}
 
               <View style={styles.imageWrapper}>
-                {player.imageUrl && !imgError ? (
-                  <Image
-                    source={{ uri: player.imageUrl }}
-                    style={styles.playerImage}
-                    resizeMode="contain"
-                    onError={() => setImgError(true)}
-                  />
-                ) : (
-                  <FallbackImage
-                    name={player.strPlayer}
-                    number={player.strNumber}
-                    height={180}
-                  />
-                )}
+                <PlayerImage
+                  cutoutUrl={player.imageUrl}
+                  thumbUrl={player.thumbUrl}
+                  name={player.strPlayer}
+                  number={player.strNumber}
+                  height={195}
+                />
               </View>
 
               <Text style={styles.playerName}>{player.strPlayer}</Text>
@@ -127,8 +159,35 @@ export default function JugadorDetailScreen() {
                   </Text>
                 </View>
               </View>
+
+              {/* Compare Action Button */}
+              <TouchableOpacity
+                style={[
+                  styles.heroCompareBtn,
+                  assignedSlot !== null && styles.heroCompareBtnActive,
+                ]}
+                onPress={handleComparePress}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={assignedSlot !== null ? 'checkmark-circle' : 'swap-horizontal'}
+                  size={16}
+                  color={assignedSlot !== null ? COLORS.primary : COLORS.textPrimary}
+                />
+                <Text
+                  style={[
+                    styles.heroCompareBtnText,
+                    assignedSlot !== null && styles.heroCompareBtnTextActive,
+                  ]}
+                >
+                  {assignedSlot !== null
+                    ? `En Comparador (Jugador ${assignedSlot}) — Ver`
+                    : 'Añadir a Comparar'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
+
 
           {/* Quick Stats Grid */}
           <View style={styles.sectionCard}>
@@ -231,6 +290,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
+  topBarFavBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -273,7 +339,7 @@ const styles = StyleSheet.create({
   },
   imageWrapper: {
     width: '100%',
-    height: 190,
+    height: 210,
     backgroundColor: COLORS.secondary,
     borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
@@ -283,7 +349,8 @@ const styles = StyleSheet.create({
   },
   playerImage: {
     width: '100%',
-    height: '100%',
+    height: '105%',
+    transform: [{ translateY: 10 }],
   },
   playerName: {
     fontSize: 24,
@@ -315,7 +382,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
+  heroCompareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 9,
+    borderRadius: BORDER_RADIUS.full,
+    marginTop: SPACING.md,
+    minHeight: 40,
+  },
+  heroCompareBtnActive: {
+    backgroundColor: COLORS.secondary,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  heroCompareBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  heroCompareBtnTextActive: {
+    color: COLORS.primary,
+  },
   sectionCard: {
+
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
