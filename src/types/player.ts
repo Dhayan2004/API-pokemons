@@ -51,9 +51,10 @@ export interface Player {
   thumbUrl: string | null;
   description: string;      // ES description or EN or default fallback message
   strNumber: string | null;
+  isComplete?: boolean;     // True if loaded from lookupplayer (has physical data/full description)
 }
 
-// Search / Featured API Response wrapper
+// Search / Featured API Response wrapper (TheSportsDB v1 returns 'player' on search and 'players' on lookup)
 export interface APIPlayersResponse {
   players?: TheSportsDBPlayer[] | null;
   player?: TheSportsDBPlayer[] | null;
@@ -66,3 +67,4 @@ export interface PlayerFetchResult {
   error: string | null;
   loading: boolean;
 }
+

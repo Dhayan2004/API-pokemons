@@ -1,9 +1,14 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/theme';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const safeBottom = Math.max(insets.bottom, 10);
+  const barHeight = 62 + safeBottom;
+
   return (
     <Tabs
       screenOptions={{
@@ -13,13 +18,20 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: COLORS.white,
           borderTopColor: COLORS.borderColor,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
+          borderTopWidth: 1,
+          height: barHeight,
+          paddingTop: 8,
+          paddingBottom: safeBottom,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '700',
+          lineHeight: 16,
+          marginTop: 2,
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
         },
       }}
     >
@@ -37,19 +49,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="buscar"
-        options={{
-          title: 'Buscar',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'search' : 'search-outline'}
-              size={24}
-              color={color as string}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="comparar"
         options={{
           title: 'Comparar',
@@ -60,6 +59,13 @@ export default function TabsLayout() {
               color={color as string}
             />
           ),
+        }}
+      />
+      {/* Hide former 'buscar' route from tabs while redirecting to Inicio */}
+      <Tabs.Screen
+        name="buscar"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
